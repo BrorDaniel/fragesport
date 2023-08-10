@@ -1,4 +1,3 @@
-document.addEventListener("DOMContentLoaded", function() {
 const socket = io();
 
 let username = '';
@@ -17,9 +16,7 @@ let existingGames = [
   {name: "Game 2", players: 7, maxPlayers: 10, hasPassword: false}
 ];
 
-function game() {
-  // 1. Initialization
-  let gameId = '';
+let gameId = '';
   let gameName = '';
   let gamePassword = '';
   let gamePrivacy = 'public'; // default to public
@@ -27,24 +24,41 @@ function game() {
 
   // 2. Event Listeners
   document.getElementById('createGame').addEventListener('click', function() {
-      const gameNameInput = document.getElementById('game-name');
-      gameName = gameNameInput.value.trim();
+    const gameNameInput = document.getElementById('game-name');
+    gameName = gameNameInput.value.trim();
 
-      if (gameName && gameName.length <= 15) {
-          createGame(); // Call the createGame function
-      } else {
-          alert('Vänligen ange ett spelnamn med högst 15 tecken.');
-      }
-  });
+    if (gameName && gameName.length <= 15) {
+        createGame(); // Call the createGame function
+    } else {
+        alert('Vänligen ange ett spelnamn med högst 15 tecken.');
+    }
+});
 
-  // 3. Socket Communication
-  function createGame() {
-      const gamePasswordInput = document.getElementById('game-password');
-      gamePassword = gamePasswordInput.value.trim();
+function createGame(event) {
+  console.log("createGame function called");
+  const gamePasswordInput = document.getElementById('game-password');
+  gamePassword = gamePasswordInput.value.trim();
 
-      // Emit the 'createGame' event to the server with the game details
-      socket.emit('createGame', { gameName, maxPlayers, gamePrivacy, gamePassword });
+  // Emit the 'createGame' event to the server with the game details
+  socket.emit('createGame', { gameName, maxPlayers, gamePrivacy, gamePassword });
+  if (event) event.preventDefault();
+}
+
+function game() {
+  // 1. Initialization
+  window.onload = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameIdFromUrl = urlParams.get('gameId');
+    
+    if (gameIdFromUrl) {
+      // Hide the game creation view
+      document.getElementById('gameCreationView').style.display = 'none';
+      
+      // Show the lobby view
+      document.getElementById('avatarUsernameView').style.display = 'block';
+    }
   }
+
 
   // Listen for a response from the server after creating a game
   socket.on('gameCreated', (data) => {
@@ -257,6 +271,19 @@ socket.on('message', (data) => {
 socket.on('gameCreated', (data) => {
   gameId = data.gameId; // Update the global gameId variable with the provided gameId
   // Handle game creation success, e.g., show a message to the user or navigate to the game lobby
+});
+
+socket.on('newGameCreated', (data) => {
+  console.log("Received createGame event from client");
+  console.log("Game ID:", data.gameId);
+  
+  // Hide the game creation view
+  document.getElementById('gameCreationView').style.display = 'none';
+  
+  // Show the lobby view
+  document.getElementById('avatarUsernameView').style.display = 'block';
+  
+  // You can also set the game ID somewhere on the page or in a variable if needed
 });
 
 socket.on('gameJoinSuccess', (data) => {
@@ -474,6 +501,7 @@ socket.on('wrongAnswer', (data) => {
 updatePlayerStreak('player1', true);
 
 socket.on('updateUserList', (userList) => {
+  console.log("Received user list:", userList);
   const userListElement = document.getElementById('userList');
   userListElement.innerHTML = '';
   userList.sort((a, b) => b.score - a.score);
@@ -742,5 +770,3 @@ function showWrongAnswerAnimation(username) {
     }, 1000); // Remove the shake-avatar class after 1 second (adjust as needed)
   }
 }
-
-});

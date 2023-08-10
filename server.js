@@ -12,6 +12,7 @@ const questions = require('./public/questions.json');
 const QUESTION_TIMEOUT = 20000; // 20 seconds for each question
 
 app.post('/createGame', (req, res) => {
+  console.log("Received createGame event from client");
   const gameCode = generateUniqueGameCode();
   games[gameCode] = new Game();
   res.json({ success: true, gameCode, message: 'Game created successfully!' });
@@ -35,6 +36,17 @@ app.post('/joinGame', (req, res) => {
 
 io.on('connection', (socket) => {
   console.log('A user connected');
+
+  function generateGameId() {
+    return Math.floor(Math.random() * 1000000).toString();
+}
+
+  socket.on('createGame', (data) => {
+    console.log("Received createGame event from client");
+    const gameId = generateGameId();  // You'll need a function to generate unique game IDs
+    // Store the game data if needed
+    socket.emit('newGameCreated', { gameId: gameId });
+});
 
   socket.on('join', ({ username, avatar, gameCode }) => {
     const game = games[gameCode];
@@ -199,6 +211,10 @@ class Game {
     this.userStreaks = {};
     this.questionStartTime = null;
   }
+
+  generateGameId() {
+    return Math.floor(Math.random() * 1000000).toString();
+}
 
   loadQuestionsAndStart() {
     this.currentQuestion = 0;

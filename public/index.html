@@ -29,7 +29,7 @@
           <label>Privat</label>
       </div>
       <input type="text" id="game-password" placeholder="Lösenord" maxlength="10" class="hidden">
-      <button id="createGame">Skapa spel</button>
+      <button id="createGame" onclick="createGame(event)">Skapa spel</button>
     </div>
     <div id="joinGame"></div>
   </div>
@@ -95,6 +95,6 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.10.2/Sortable.min.js"></script>
-  <script src="client.js"></script>
+  <script src="client.js" defer></script>
 </body>
 </html>
