@@ -1,3 +1,4 @@
+document.addEventListener("DOMContentLoaded", function() {
 const socket = io();
 
 let username = '';
@@ -11,15 +12,46 @@ let streakCounter = 0;
 let streakData = {};
 let lastCorrectAnswerUser = null;
 let shouldClearTimer = false;
-let gameName = '';
-let gamePassword = '';
-let gamePrivacy = 'public'; // default to public
-let maxPlayers = 1; // default to 1 player
-let gameId = '';
 let existingGames = [
   {name: "Game 1", players: 5, maxPlayers: 10, hasPassword: true},
   {name: "Game 2", players: 7, maxPlayers: 10, hasPassword: false}
 ];
+
+function game() {
+  // 1. Initialization
+  let gameId = '';
+  let gameName = '';
+  let gamePassword = '';
+  let gamePrivacy = 'public'; // default to public
+  let maxPlayers = 1; // default to 1 player
+
+  // 2. Event Listeners
+  document.getElementById('createGame').addEventListener('click', function() {
+      const gameNameInput = document.getElementById('game-name');
+      gameName = gameNameInput.value.trim();
+
+      if (gameName && gameName.length <= 15) {
+          createGame(); // Call the createGame function
+      } else {
+          alert('Vänligen ange ett spelnamn med högst 15 tecken.');
+      }
+  });
+
+  // 3. Socket Communication
+  function createGame() {
+      const gamePasswordInput = document.getElementById('game-password');
+      gamePassword = gamePasswordInput.value.trim();
+
+      // Emit the 'createGame' event to the server with the game details
+      socket.emit('createGame', { gameName, maxPlayers, gamePrivacy, gamePassword });
+  }
+
+  // Listen for a response from the server after creating a game
+  socket.on('gameCreated', (data) => {
+      gameId = data.gameId; // Update the gameId with the one provided by the server
+      // Here, you can also update the UI to show that the game was created successfully
+  });
+}
 
 game();
 
@@ -49,30 +81,8 @@ existingGames.forEach(game => {
       }
   }
   
-  document.getElementById("existing-games-list").appendChild(gameDiv);
+  document.getElementById("joinGame").appendChild(gameDiv);
 });
-
-document.getElementById('createGameButton').addEventListener('click', function() {
-  socket.emit('createGame');
-  const gameNameInput = document.getElementById('game-name');
-  const gameNameValue = gameNameInput.value.trim();
-
-  if (gameNameValue && gameNameValue.length <= 15) {
-      createGame(); // Directly call the createGame function
-  } else {
-      alert('Vänligen ange ett spelnamn med högst 15 tecken.');
-  }
-});
-
-function createGame() {
-  const gameNameInput = document.getElementById('game-name');
-  gameName = gameNameInput.value.trim();
-
-  const gamePasswordInput = document.getElementById('game-password');
-  gamePassword = gamePasswordInput.value.trim();
-
-  socket.emit('createGame', { gameName, maxPlayers, gamePrivacy, gamePassword });
-}
 
 function joinGame(gameIdToJoin, isPrivate) {
   gameId = gameIdToJoin; // Update the global gameId variable
@@ -85,7 +95,6 @@ function joinGame(gameIdToJoin, isPrivate) {
 }
 
 function showLobby() {
-  document.getElementById('pre-game-page').classList.add('hidden');
   document.getElementById('lobby').classList.remove('hidden');
 }
 
@@ -100,10 +109,6 @@ document.getElementById('joinGame').addEventListener('click', function() {
   // On success:
   showLobby();
   socket.emit('joinGame');
-});
-
-document.getElementById('joinLobby').addEventListener('click', function() {
-  joinLobby(); // Direct the user to the game lobby after selecting avatar and username
 });
 
 function joinLobby() {
@@ -598,29 +603,6 @@ document.getElementById("game-privacy-toggle").addEventListener("change", functi
       },
     }
   );
-
-  // Show the "Spela igen" button
-  playAgainBtn.classList.remove('hidden');
-});
-
-// Event listener for the "Spela igen" button
-const playAgainBtn = document.getElementById('play-again-btn');
-playAgainBtn.addEventListener('click', () => {
-  playAgainBtn.classList.add('hidden'); // Hide the button after clicking
-  socket.emit('playAgain'); // Emit the 'playAgain' event to the server
-});
-
-function playAgain() {
-  socket.emit('playAgain');
-}
-
-socket.on('allUsersAnswered', () => {
-  const chat = document.getElementById('chat');
-  clearInterval(timerInterval);
-  setTimeout(() => {
-    askNewQuestion();
-  }, 3000);
-  chat.scrollTop = chat.scrollHeight;
 });
 
 socket.on('allUsersAnswered', () => {
@@ -643,11 +625,6 @@ socket.on('newQuestion', () => {
 socket.on('restartGame', () => {
   // Here you can update the UI as needed, e.g., clear the previous question and answers
   // and display any messages to the players if necessary
-});
-
-document.getElementById('playAgainButton').addEventListener('click', () => {
-  // Call the playAgain function to emit the event to the server
-  playAgain();
 });
 
 function askNewQuestion() {
@@ -765,3 +742,5 @@ function showWrongAnswerAnimation(username) {
     }, 1000); // Remove the shake-avatar class after 1 second (adjust as needed)
   }
 }
+
+});
