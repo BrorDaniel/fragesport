@@ -21,6 +21,8 @@ let existingGames = [
   {name: "Game 2", players: 7, maxPlayers: 10, hasPassword: false}
 ];
 
+game();
+
 existingGames.forEach(game => {
   let gameDiv = document.createElement("div");
   gameDiv.innerHTML = `${game.name} (${game.players}/${game.maxPlayers})`;
@@ -51,6 +53,7 @@ existingGames.forEach(game => {
 });
 
 document.getElementById('createGameButton').addEventListener('click', function() {
+  socket.emit('createGame');
   const gameNameInput = document.getElementById('game-name');
   const gameNameValue = gameNameInput.value.trim();
 
@@ -96,6 +99,7 @@ document.getElementById('joinGame').addEventListener('click', function() {
   // Make an AJAX request to join a game
   // On success:
   showLobby();
+  socket.emit('joinGame');
 });
 
 document.getElementById('joinLobby').addEventListener('click', function() {

@@ -11,130 +11,6 @@ app.use(express.static(__dirname + '/public'));
 const questions = require('./public/questions.json');
 const QUESTION_TIMEOUT = 20000; // 20 seconds for each question
 
-class Game {
-  constructor() {
-    this.users = [];
-    this.currentQuestion = 0;
-    this.gameInProgress = false;
-    this.userAttempts = {};
-    this.questionTimer;
-    this.answerScores = [3, 2, 1];
-    this.correctAnswers = [];
-    this.correctAnsweredUsers = {};
-    this.userLastAnswerTime = {};
-    this.correctAnsweredCount = 0;
-    this.finishedAnsweringCount = 0;
-    this.userStreaks = {};
-    this.questionStartTime = null;
-  }
-
-  loadQuestionsAndStart() {
-    this.currentQuestion = 0;
-    this.shuffleQuestions();
-    this.askQuestion();
-  }
-
-  shuffleQuestions() {
-    for (let i = questions.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [questions[i], questions[j]] = [questions[j], questions[i]];
-    }
-  }
-
-  startCountdown() {
-    io.emit('countdown', { count: 3 });
-    setTimeout(() => {
-      io.emit('countdown', { count: 2 });
-      setTimeout(() => {
-        io.emit('countdown', { count: 1 });
-      }, 1000);
-    }, 1000);
-  }
-
-  resetStreak(username, userIndex) {
-    this.userStreaks[username] = 0;
-    this.users[userIndex].isOnFire = false;
-    this.users[userIndex].isBlazing = false;
-  }
-
-  getCorrectAnswerText(answers) {
-    if (!answers || answers.length === 0) {
-      return '';
-    }
-
-    if (answers.length === 1) {
-      return answers[0];
-    }
-
-    // Find the longest correct answer
-    let longestAnswer = answers[0];
-    for (let i = 1; i < answers.length; i++) {
-      if (answers[i].length > longestAnswer.length) {
-        longestAnswer = answers[i];
-      }
-    }
-
-    return longestAnswer;
-  }
-
-  sendPointsFeedback(username, points) {
-    io.emit('message', { username: 'Bot', message: `${username} svarade rätt och fick ${points} poäng!` });
-  }
-
-  askQuestion() {
-    if (currentQuestion < questions.length) {
-      correctAnswers = [];
-      correctAnsweredUsers = {};
-      correctAnsweredCount = 0; // Reset the count
-      const question = questions[currentQuestion++];
-      for (const user in userAttempts) {
-        userAttempts[user] = 3;
-      }
-      startCountdown();
-      const currentTime = Date.now();
-    for (let user of users) {
-        if (user.isOnFire && (currentTime - (userLastAnswerTime[user.username] || 0) > 5000)) {
-            user.isOnFire = false;
-        }
-    }
-    io.emit('updateUserList', users);
-
-      setTimeout(() => {
-        questionStartTime = Date.now();
-        io.emit('question', {
-          username: 'Bot',
-          questionNumber: currentQuestion,
-          question: question.question,
-          correctAnswerText: getCorrectAnswerText(question.answer)
-        });
-        setTimeout(() => {
-          const currentTime = Date.now();
-          for (let user of users) {
-              if ((currentTime - (userLastAnswerTime[user.username] || 0) > 5000)) {
-                  resetStreak(user.username, users.findIndex(u => u.username === user.username));
-              }
-          }
-          io.emit('updateUserList', users);
-      }, 5000);
-        if (questionTimer) {
-          clearTimeout(questionTimer);
-        }
-        questionTimer = setTimeout(() => {
-          io.emit('message', { username: 'Bot', message: `Tiden är ute! Rätt svar är ${getCorrectAnswerText(question.answer)}. Nästa fråga om...` });
-          setTimeout(() => {
-            askQuestion();
-          }, 3000);
-        }, QUESTION_TIMEOUT);
-        io.emit('scrollChatToBottom');
-      }, 4000);
-    } else {
-      gameInProgress = false;
-      io.emit('message', { username: 'Bot', message: 'Inga fler frågor. Tack för att du spelade!' });
-    }
-  }
-
-  // ... [rest of the methods for the Game class]
-}
 app.post('/createGame', (req, res) => {
   const gameCode = generateUniqueGameCode();
   games[gameCode] = new Game();
@@ -268,6 +144,25 @@ io.on('connection', (socket) => {
             io.emit('updateUserList', users);  // Emit the updated user list to reflect the removed streak/fire icon
         }
     }
+
+    socket.on('disconnect', () => {
+      console.log('A user disconnected');
+      const gameCode = socket.gameCode;
+      if (gameCode && games[gameCode]) {
+          const game = games[gameCode];
+          const index = game.users.findIndex((user) => user.id === socket.id);
+          if (index !== -1) {
+              game.users.splice(index, 1);
+          }
+          if (game.users.length === 0) {
+              setTimeout(() => {
+                  if (games[gameCode] && games[gameCode].users.length === 0) {
+                      delete games[gameCode];
+                  }
+              }, 300000);  // 5 minutes delay before deleting the game
+          }
+      }
+    });
 });
 
   function generateUniqueGameCode() {
@@ -286,25 +181,132 @@ io.on('connection', (socket) => {
     return gameCode;
 }
 
-socket.on('disconnect', () => {
-  console.log('A user disconnected');
-  const gameCode = socket.gameCode;
-  if (gameCode && games[gameCode]) {
-      const game = games[gameCode];
-      const index = game.users.findIndex((user) => user.id === socket.id);
-      if (index !== -1) {
-          game.users.splice(index, 1);
-      }
-      if (game.users.length === 0) {
-          setTimeout(() => {
-              if (games[gameCode] && games[gameCode].users.length === 0) {
-                  delete games[gameCode];
-              }
-          }, 300000);  // 5 minutes delay before deleting the game
-      }
+});
+
+class Game {
+  constructor() {
+    this.users = [];
+    this.currentQuestion = 0;
+    this.gameInProgress = false;
+    this.userAttempts = {};
+    this.questionTimer;
+    this.answerScores = [3, 2, 1];
+    this.correctAnswers = [];
+    this.correctAnsweredUsers = {};
+    this.userLastAnswerTime = {};
+    this.correctAnsweredCount = 0;
+    this.finishedAnsweringCount = 0;
+    this.userStreaks = {};
+    this.questionStartTime = null;
   }
-});
-});
+
+  loadQuestionsAndStart() {
+    this.currentQuestion = 0;
+    this.shuffleQuestions();
+    this.askQuestion();
+  }
+
+  shuffleQuestions() {
+    for (let i = questions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [questions[i], questions[j]] = [questions[j], questions[i]];
+    }
+  }
+
+  startCountdown() {
+    io.emit('countdown', { count: 3 });
+    setTimeout(() => {
+      io.emit('countdown', { count: 2 });
+      setTimeout(() => {
+        io.emit('countdown', { count: 1 });
+      }, 1000);
+    }, 1000);
+  }
+
+  resetStreak(username, userIndex) {
+    this.userStreaks[username] = 0;
+    this.users[userIndex].isOnFire = false;
+    this.users[userIndex].isBlazing = false;
+  }
+
+  getCorrectAnswerText(answers) {
+    if (!answers || answers.length === 0) {
+      return '';
+    }
+
+    if (answers.length === 1) {
+      return answers[0];
+    }
+
+    // Find the longest correct answer
+    let longestAnswer = answers[0];
+    for (let i = 1; i < answers.length; i++) {
+      if (answers[i].length > longestAnswer.length) {
+        longestAnswer = answers[i];
+      }
+    }
+
+    return longestAnswer;
+  }
+
+  sendPointsFeedback(username, points) {
+    io.emit('message', { username: 'Bot', message: `${username} svarade rätt och fick ${points} poäng!` });
+  }
+
+  askQuestion() {
+    if (currentQuestion < questions.length) {
+      correctAnswers = [];
+      correctAnsweredUsers = {};
+      correctAnsweredCount = 0; // Reset the count
+      const question = questions[currentQuestion++];
+      for (const user in userAttempts) {
+        userAttempts[user] = 3;
+      }
+      startCountdown();
+      const currentTime = Date.now();
+    for (let user of users) {
+        if (user.isOnFire && (currentTime - (userLastAnswerTime[user.username] || 0) > 5000)) {
+            user.isOnFire = false;
+        }
+    }
+    io.emit('updateUserList', users);
+
+      setTimeout(() => {
+        questionStartTime = Date.now();
+        io.emit('question', {
+          username: 'Bot',
+          questionNumber: currentQuestion,
+          question: question.question,
+          correctAnswerText: getCorrectAnswerText(question.answer)
+        });
+        setTimeout(() => {
+          const currentTime = Date.now();
+          for (let user of users) {
+              if ((currentTime - (userLastAnswerTime[user.username] || 0) > 5000)) {
+                  resetStreak(user.username, users.findIndex(u => u.username === user.username));
+              }
+          }
+          io.emit('updateUserList', users);
+      }, 5000);
+        if (questionTimer) {
+          clearTimeout(questionTimer);
+        }
+        questionTimer = setTimeout(() => {
+          io.emit('message', { username: 'Bot', message: `Tiden är ute! Rätt svar är ${getCorrectAnswerText(question.answer)}. Nästa fråga om...` });
+          setTimeout(() => {
+            askQuestion();
+          }, 3000);
+        }, QUESTION_TIMEOUT);
+        io.emit('scrollChatToBottom');
+      }, 4000);
+    } else {
+      gameInProgress = false;
+      io.emit('message', { username: 'Bot', message: 'Inga fler frågor. Tack för att du spelade!' });
+    }
+  }
+
+  // ... [rest of the methods for the Game class]
+}
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
