@@ -5,7 +5,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 const games = {};
-
+const activeGamesList = [];
 app.use(express.static(__dirname + '/public'));
 
 const questions = require('./public/questions.json');
@@ -15,6 +15,13 @@ app.post('/createGame', (req, res) => {
   console.log("Received createGame event from client");
   const gameCode = generateUniqueGameCode();
   games[gameCode] = new Game();
+
+  // Add the game to the active games list
+  activeGamesList.push({ gameCode, name: req.body.gameName, maxPlayers: req.body.maxPlayers });
+
+  // Emit the updated games list to all clients
+  io.emit('updateGamesList', activeGamesList);
+
   res.json({ success: true, gameCode, message: 'Game created successfully!' });
 });
 
@@ -48,16 +55,12 @@ io.on('connection', (socket) => {
     socket.emit('newGameCreated', { gameId: gameId });
 });
 
-  socket.on('join', ({ username, avatar, gameCode }) => {
-    const game = games[gameCode];
-    if (game) {
-      game.users.push({ username, score: 0, avatar, isOnFire: false, ready: false });
-      socket.gameCode = gameCode;
-      io.emit('updateUserList', game.users);
-    } else {
-      socket.emit('error', { message: 'Invalid game code. Please check and try again.' });
-    }
-  });
+socket.on('join', (username, avatar) => {
+  socket.username = username;
+  socket.avatar = avatar;
+  users.push({ username: socket.username, avatar: socket.avatar });
+  io.emit('updateUserList', users);
+});
   
     socket.on('userReady', (username) => { // Listen for 'userReady' event
       const userIndex = games[socket.gameCode].users.findIndex(user => user.username === username);

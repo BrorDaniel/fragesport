@@ -108,6 +108,34 @@ function joinGame(gameIdToJoin, isPrivate) {
 }
 }
 
+function joinGame(gameCode) {
+  // 1. Prompt the user for necessary information
+  const username = prompt("Enter your username:");
+  if (!username) {
+      alert("Username is required to join a game.");
+      return;
+  }
+  const avatar = prompt("Choose an avatar (e.g., avatar1, avatar2):");
+  if (!avatar) {
+      alert("Avatar choice is required to join a game.");
+      return;
+  }
+
+  // 2. Send a request to the server to join the game
+  socket.emit('joinGameRequest', { gameCode, username, avatar });
+
+  // 3. Listen for server response (this can be set up elsewhere in your client.js)
+  socket.on('joinGameResponse', (response) => {
+      if (response.success) {
+          // Navigate the user to the game lobby
+          window.location.href = `/game/${gameCode}`;
+      } else {
+          // Display an error message to the user
+          alert(response.message);
+      }
+  });
+}
+
 function showLobby() {
   document.getElementById('lobby').classList.remove('hidden');
 }
@@ -284,6 +312,17 @@ socket.on('newGameCreated', (data) => {
   document.getElementById('avatarUsernameView').style.display = 'block';
   
   // You can also set the game ID somewhere on the page or in a variable if needed
+});
+
+socket.on('updateGamesList', (gamesList) => {
+  const gamesListElement = document.getElementById('gamesList'); // Assuming you have an element with id 'gamesList' to display the games
+  gamesListElement.innerHTML = ''; // Clear the current list
+
+  gamesList.forEach(game => {
+      const gameElement = document.createElement('li');
+      gameElement.innerHTML = `${game.name} (Code: ${game.gameCode}) - Max Players: ${game.maxPlayers} <button onclick="joinGame('${game.gameCode}')">Gå med</button>`;
+      gamesListElement.appendChild(gameElement);
+  });
 });
 
 socket.on('gameJoinSuccess', (data) => {
@@ -499,35 +538,46 @@ socket.on('wrongAnswer', (data) => {
 // Call this function whenever a player answers a question
 // Pass in the player's id and whether their answer was correct
 updatePlayerStreak('player1', true);
+const avatarSelect = document.getElementById('avatarSelect');
 
 socket.on('updateUserList', (userList) => {
   console.log("Received user list:", userList);
   const userListElement = document.getElementById('userList');
   userListElement.innerHTML = '';
+
+  // Sort users by score
   userList.sort((a, b) => b.score - a.score);
+
   userList.forEach((user) => {
       const userElement = document.createElement('li');
       userElement.classList.add('userListItem');
       userElement.dataset.username = user.username;
-      
-      let innerHTMLContent = `<img src="/avatars/${user.avatar}.png" alt="${user.username}" class="user-avatar"> <strong>${user.username}</strong> <span class="score">(${user.score} poäng)</span>`;
-      
-      if (user.isOnFire) { // Check if the user is on fire
+
+      // Construct the inner HTML for the user element
+      let innerHTMLContent = `<img src="/avatars/${user.avatar}.png" alt="${user.username}" class="user-avatar"> 
+                              <strong>${user.username}</strong> 
+                              <span class="score">(${user.score} poäng)</span>`;
+
+      // Check if the user is on fire
+      if (user.isOnFire) {
           innerHTMLContent += ` <img src="/fire.gif" alt="Fire" class="fire-icon">`;
       }
-      if (user.isBlazing) { // Check if the user is blazing hot
-        innerHTMLContent += ` <img src="/blazing.gif" alt=\"Blazing Hot\" class=\"blazing-icon\">`;
-    }
+
+      // Check if the user is blazing hot
+      if (user.isBlazing) {
+          innerHTMLContent += ` <img src="/blazing.gif" alt="Blazing Hot" class="blazing-icon">`;
+      }
+
       userElement.innerHTML = innerHTMLContent;
       userListElement.appendChild(userElement);
 
+      // Check if the user's score is 20 or more
       if (user.score >= 20) {
-        // document.body.classList.add('fade'); // Commented out to remove fade effect
-        document.getElementById('winner').style.display = 'block';
-        document.querySelector('.winner-avatar').src = `/avatars/${user.avatar}.png`;
-        document.querySelector('#winner h2').innerText = user.username;
-        document.querySelector('#winner p').innerText = `(${user.score} poäng)`;
-        document.getElementById('winner').classList.add('zoom');
+          document.getElementById('winner').style.display = 'block';
+          document.querySelector('.winner-avatar').src = `/avatars/${user.avatar}.png`;
+          document.querySelector('#winner h2').innerText = user.username;
+          document.querySelector('#winner p').innerText = `(${user.score} poäng)`;
+          document.getElementById('winner').classList.add('zoom');
       }
   });
 });
