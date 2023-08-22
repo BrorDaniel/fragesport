@@ -23,13 +23,21 @@
       <div class="toggle-container">
           <label class="switch">
               <input type="checkbox" id="game-privacy-toggle">
+              <label for="maxPlayers">Max Players:</label>
+<select id="maxPlayers" name="maxPlayers">
+  <option value="2">2</option>
+  <option value="3">3</option>
+  <option value="4">4</option>
+  <!-- Add more options as needed -->
+</select>
               <span class="slider round"></span>
           </label>
           <label>Offentlig</label>
           <label>Privat</label>
       </div>
       <input type="text" id="game-password" placeholder="Lösenord" maxlength="10" class="hidden">
-      <button id="createGame" onclick="createGame(event)">Skapa spel</button>
+      <button id="createGame" onclick="createGame()">Skapa spel</button>
+      <div id="gameIdDisplay"></div>
     </div>
     <div id="joinGame"></div>
   </div>
@@ -52,9 +60,11 @@
         <div id="avatarSelectedMessage" style="display: none; color: red;">Vänligen välj både karaktär och användarnamn för att gå med i spelet.</div>
       </div>
     </div>
+    <div id="gameIdDisplay"></div>
   </div>
 
   <div id="game" style="display: none;">
+    <div id="gameIdDisplay"></div>
     <div class="game-container">
         <div class="user-list-column">
             <h2>Spelare</h2>
