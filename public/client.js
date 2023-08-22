@@ -34,14 +34,31 @@ let gameId = '';
     }
 });
 
-function createGame(event) {
-  console.log("createGame function called");
-  const gamePasswordInput = document.getElementById('game-password');
-  gamePassword = gamePasswordInput.value.trim();
+function createGame() {
+  fetch('/create', {
+    method: 'POST'
+  }).then(response => response.json()).then(data => {
+    gameId = data.id;
+    showLobby();
+  });
+}
 
-  // Emit the 'createGame' event to the server with the game details
-  socket.emit('createGame', { gameName, maxPlayers, gamePrivacy, gamePassword });
-  if (event) event.preventDefault();
+function joinGame() {
+  let id = document.getElementById('gameId').value;
+  fetch('/join', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ id: id })
+  }).then(response => response.json()).then(data => {
+    if (data.status == 'joined') {
+      gameId = id;
+      showLobby();
+    } else {
+      alert('Game not found');
+    }
+  });
 }
 
 function game() {
@@ -765,10 +782,16 @@ window.onload = function() {
 
 document.addEventListener("DOMContentLoaded", function() {
   const gamePrivacyToggle = document.getElementById('game-privacy-toggle');
+  const gamePasswordInput = document.getElementById('game-password');
+  
   gamePrivacyToggle.addEventListener('change', function() {
-    gamePrivacy = this.checked ? 'private' : 'public';
-    const gamePasswordInput = document.getElementById('game-password');
-    gamePasswordInput.style.display = this.checked ? 'block' : 'none';
+    if (this.checked) {
+      gamePasswordInput.classList.remove('hidden');
+      gamePrivacy = 'private';
+    } else {
+      gamePasswordInput.classList.add('hidden');
+      gamePrivacy = 'public';
+    }
   });
 
   // Add event listeners for player count buttons (1-10)
