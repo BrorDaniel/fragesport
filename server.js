@@ -7,37 +7,25 @@ const io = socketIO(server);
 const games = {};
 const activeGamesList = [];
 app.use(express.static(__dirname + '/public'));
+app.use(express.json());
 
 const questions = require('./public/questions.json');
 const QUESTION_TIMEOUT = 20000; // 20 seconds for each question
 
-app.post('/createGame', (req, res) => {
-  console.log("Received createGame event from client");
-  const gameCode = generateUniqueGameCode();
-  games[gameCode] = new Game();
-
-  // Add the game to the active games list
-  activeGamesList.push({ gameCode, name: req.body.gameName, maxPlayers: req.body.maxPlayers });
-
-  // Emit the updated games list to all clients
-  io.emit('updateGamesList', activeGamesList);
-
-  res.json({ success: true, gameCode, message: 'Game created successfully!' });
+app.post('/create', (req, res) => {
+  let game = new Game();
+  const gameId = game.generateGameId();
+  games[gameId] = game;
+  res.json({ id: gameId }); // Send JSON response
 });
 
-app.post('/joinGame', (req, res) => {
-  const { gameCode } = req.body;
-  const game = games[gameCode];
+app.post('/join', (req, res) => {
+  let game = games[req.body.id];
   if (game) {
-    if (game.gameInProgress) {
-      res.json({ success: false, message: 'Game already in progress. Please join another game or create a new one.' });
-    } else {
-      // Add user to the game
-      // ... [rest of the logic]
-      res.json({ success: true, message: 'Joined the game successfully!' });
-    }
+    game.addPlayer();
+    res.json({ status: 'joined' }); // Send JSON response
   } else {
-    res.json({ success: false, message: 'Invalid game code. Please check and try again.' });
+    res.json({ status: 'not found' }); // Send JSON response
   }
 });
 
@@ -47,6 +35,50 @@ io.on('connection', (socket) => {
   function generateGameId() {
     return Math.floor(Math.random() * 1000000).toString();
 }
+
+function createGame() {
+  const gameName = document.getElementById('game-name').value;
+  const isPrivate = document.getElementById('game-privacy-toggle').checked;
+  const gamePassword = document.getElementById('game-password').value;
+
+  // Validate the input (e.g., check if the game name is not empty)
+  if (!gameName) {
+    alert('Please enter a game name.');
+    return;
+  }
+
+  // Create the game object to send to the server
+  const gameData = {
+    name: gameName,
+    private: isPrivate,
+    password: gamePassword
+  };
+
+  // Send a request to the server to create the game
+  fetch('/create', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(gameData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.id) {
+      // Redirect to the game lobby or handle the game creation success
+      window.location.href = `/lobby/${data.id}`;
+    } else {
+      // Handle any errors (e.g., show an error message to the user)
+      alert('Failed to create the game. Please try again.');
+    }
+  })
+  .catch(error => {
+    // Handle any network errors
+    console.error('Error creating the game:', error);
+    alert('An error occurred while creating the game. Please try again.');
+  });
+}
+
 
   socket.on('createGame', (data) => {
     console.log("Received createGame event from client");
