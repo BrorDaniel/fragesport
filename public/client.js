@@ -11,16 +11,13 @@ let streakCounter = 0;
 let streakData = {};
 let lastCorrectAnswerUser = null;
 let shouldClearTimer = false;
-let existingGames = [
-  {name: "Game 1", players: 5, maxPlayers: 10, hasPassword: true},
-  {name: "Game 2", players: 7, maxPlayers: 10, hasPassword: false}
-];
+let existingGames = [];
 
 let gameId = '';
   let gameName = '';
   let gamePassword = '';
   let gamePrivacy = 'public'; // default to public
-  let maxPlayers = 1; // default to 1 player
+  let maxPlayers = ''; // default to 1 player
 
   // 2. Event Listeners
   document.getElementById('createGame').addEventListener('click', function() {
@@ -34,14 +31,53 @@ let gameId = '';
     }
 });
 
+// Function to create a new game
 function createGame() {
+  // Fetch the create game endpoint
   fetch('/create', {
-    method: 'POST'
-  }).then(response => response.json()).then(data => {
-    gameId = data.id;
-    showLobby();
-  });
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      gameName: gameName,
+      maxPlayers: maxPlayers,
+      gamePrivacy: gamePrivacy,
+      gamePassword: gamePassword // If you have a password field, include it here
+    })
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      console.log("Game ID:", data.gameId);
+
+      // Hide the game creation view
+      document.getElementById('gameCreationView').style.display = 'none';
+
+      // Show the lobby view
+      document.getElementById('avatarUsernameView').style.display = 'block';
+
+      // You can also set the game ID somewhere on the page or in a variable if needed
+      // Example:
+      document.getElementById('gameIdDisplay').innerText = data.gameId;
+    })
+    .catch((error) => {
+      console.error("Error creating game:", error);
+      alert('An error occurred while creating the game. Please try again.');
+    });
 }
+
+// Event Listener
+document.getElementById('createGame').addEventListener('click', function() {
+  const gameNameInput = document.getElementById('game-name');
+  gameName = gameNameInput.value.trim();
+
+  if (gameName && gameName.length <= 15) {
+    createGame(); // Call the createGame function
+  } else {
+    alert('Vänligen ange ett spelnamn med högst 15 tecken.');
+  }
+});
+
 
 function joinGame() {
   let id = document.getElementById('gameId').value;
@@ -86,34 +122,21 @@ function game() {
 
 game();
 
-existingGames.forEach(game => {
-  let gameDiv = document.createElement("div");
-  gameDiv.innerHTML = `${game.name} (${game.players}/${game.maxPlayers})`;
-  
-  if (game.players < game.maxPlayers) {
-    let joinBtn = document.createElement("button");
-    joinBtn.innerHTML = "Gå med";
-    joinBtn.onclick = function() {
-      if (game.hasPassword) {
-          let password = prompt("Enter password:");
-          // TODO: Validate password with the server and handle the response
-          socket.emit('requestJoinGameWithPassword', { gameId: game.name, password });
-      } else {
-          gameId = game.name;
-          joinGame(gameId, false); // Join the game directly
-      }
-  };
-  gameDiv.appendChild(joinBtn);
-      
-      if (game.hasPassword) {
-          let lockIcon = document.createElement("span");
-          lockIcon.classList.add("lock-icon");
-          gameDiv.appendChild(lockIcon);
-      }
-  }
-  
-  document.getElementById("joinGame").appendChild(gameDiv);
+// Declare a variable to hold the game ID
+var currentGameId = null;
+
+socket.on('newGame', function (data) {
+  // Store the game ID in the variable
+  currentGameId = data.gameId;
+
+  // Hide the game creation view
+  document.getElementById('gameCreationView').style.display = 'none';
+
+  // Show the avatar and username selection view
+  document.getElementById('avatarUsernameView').style.display = 'block';
 });
+
+// You can now use the currentGameId variable in other parts of your code
 
 function joinGame(gameIdToJoin, isPrivate) {
   gameId = gameIdToJoin; // Update the global gameId variable
@@ -332,13 +355,36 @@ socket.on('newGameCreated', (data) => {
 });
 
 socket.on('updateGamesList', (gamesList) => {
-  const gamesListElement = document.getElementById('gamesList'); // Assuming you have an element with id 'gamesList' to display the games
-  gamesListElement.innerHTML = ''; // Clear the current list
+  const joinGameElement = document.getElementById("joinGame");
+  joinGameElement.innerHTML = ''; // Clear the current list
 
   gamesList.forEach(game => {
-      const gameElement = document.createElement('li');
-      gameElement.innerHTML = `${game.name} (Code: ${game.gameCode}) - Max Players: ${game.maxPlayers} <button onclick="joinGame('${game.gameCode}')">Gå med</button>`;
-      gamesListElement.appendChild(gameElement);
+    let gameDiv = document.createElement("div");
+    gameDiv.innerHTML = `${game.name} (${game.players}/${game.maxPlayers})`;
+
+    if (game.players < game.maxPlayers) {
+      let joinBtn = document.createElement("button");
+      joinBtn.innerHTML = "Gå med";
+      joinBtn.onclick = function() {
+        if (game.hasPassword) {
+          let password = prompt("Enter password:");
+          // TODO: Validate password with the server and handle the response
+          socket.emit('requestJoinGameWithPassword', { gameId: game.name, password });
+        } else {
+          gameId = game.name;
+          joinGame(gameId, false); // Join the game directly
+        }
+      };
+      gameDiv.appendChild(joinBtn);
+
+      if (game.hasPassword) {
+        let lockIcon = document.createElement("span");
+        lockIcon.classList.add("lock-icon");
+        gameDiv.appendChild(lockIcon);
+      }
+    }
+
+    joinGameElement.appendChild(gameDiv);
   });
 });
 
