@@ -5,36 +5,48 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 const games = {};
-const activeGamesList = [];
 app.use(express.static(__dirname + '/public'));
 app.use(express.json());
 
 const questions = require('./public/questions.json');
 const QUESTION_TIMEOUT = 20000; // 20 seconds for each question
 
+function updateGamesList() {
+  // Create an array of active games with the necessary details
+  const gamesList = Object.values(games).map(game => ({
+    name: game.name,
+    players: game.users.length,
+    maxPlayers: game.maxPlayers,
+    hasPassword: !!game.password,
+    gameCode: game.gameCode // Assuming you have a gameCode property in the Game class
+  }));
+
+  // Emit the updated games list to all connected clients
+  io.emit('updateGamesList', gamesList);
+}
+
 app.post('/create', (req, res) => {
-  let game = new Game();
+  const { name, maxPlayers, password } = req.body; // Extract these from the request body
+  let game = new Game(name, maxPlayers, password);
   const gameId = game.generateGameId();
   games[gameId] = game;
-  res.json({ id: gameId }); // Send JSON response
+  updateGamesList(); // Update the active games list
+  res.json({ id: gameId });
 });
 
 app.post('/join', (req, res) => {
   let game = games[req.body.id];
   if (game) {
     game.addPlayer();
-    res.json({ status: 'joined' }); // Send JSON response
+    updateGamesList(); // Update the active games list
+    res.json({ status: 'joined' });
   } else {
-    res.json({ status: 'not found' }); // Send JSON response
+    res.json({ status: 'not found' });
   }
 });
 
 io.on('connection', (socket) => {
   console.log('A user connected');
-
-  function generateGameId() {
-    return Math.floor(Math.random() * 1000000).toString();
-}
 
 function createGame() {
   const gameName = document.getElementById('game-name').value;
@@ -79,40 +91,44 @@ function createGame() {
   });
 }
 
-
-  socket.on('createGame', (data) => {
-    console.log("Received createGame event from client");
-    const gameId = generateGameId();  // You'll need a function to generate unique game IDs
-    // Store the game data if needed
-    socket.emit('newGameCreated', { gameId: gameId });
-});
-
-socket.on('join', (username, avatar) => {
-  socket.username = username;
-  socket.avatar = avatar;
-  users.push({ username: socket.username, avatar: socket.avatar });
-  io.emit('updateUserList', users);
+socket.on('joinGame', (gameId, username, avatar) => {
+  let game = games[gameId];
+  if (game) {
+    socket.join(gameId); // Join the room for this game
+    socket.gameCode = gameId; // Assign the game code to the socket
+    game.addPlayer(socket, username, avatar); // Add the player to the game
+    io.to(gameId).emit('updateUserList', game.users); // Notify all clients in this game
+  }
 });
   
-    socket.on('userReady', (username) => { // Listen for 'userReady' event
-      const userIndex = games[socket.gameCode].users.findIndex(user => user.username === username);
-      if (userIndex !== -1) {
-        users[userIndex].ready = true; // Set this user's 'ready' property to true
-      }
-      io.emit('updateUserList', users);
-  
-      // If all users are ready, start the game
-      if (users.every(user => user.ready)) { // Check if all users are ready
-        gameInProgress = true;
-        io.emit('startGame'); // Emit the startGame event
-        io.emit('message', { username: 'Bot', message: 'Spelet börjar strax. Först till 20 vinner!' });
-        setTimeout(() => {
-          loadQuestionsAndStart();
-        }, 3000);
-      }
-    });
+socket.on('userReady', (username) => { // Listen for 'userReady' event
+  const game = games[socket.gameCode]; // Get the game object using gameCode
+  if (!game) {
+    console.error('Game not found for code:', socket.gameCode);
+    return;
+  }
+  const userIndex = game.users.findIndex(user => user.username === username);
+  if (userIndex !== -1) {
+    game.users[userIndex].ready = true; // Set this user's 'ready' property to true
+  }
+  io.emit('updateUserList', game.users); // Emit the updated users list
 
-  socket.on('submitAnswer', (data) => {
+  // If all users are ready, start the game
+  if (game.users.every(user => user.ready)) { // Check if all users are ready
+    gameInProgress = true;
+    io.emit('startGame'); // Emit the startGame event
+    io.emit('message', { username: 'Bot', message: 'Spelet börjar strax. Först till 20 vinner!' });
+    setTimeout(() => {
+      loadQuestionsAndStart();
+    }, 3000);
+  }
+});
+
+  socket.on('submitAnswer', (gameId, data) => {
+    let game = games[gameId];
+    if (game && game.gameInProgress) {
+      game.processAnswer(socket, data);
+    }
     if (gameInProgress &&
       currentQuestion <= questions.length &&
       userAttempts[data.username] > 0 &&
@@ -209,29 +225,17 @@ socket.on('join', (username, avatar) => {
               }, 300000);  // 5 minutes delay before deleting the game
           }
       }
+      updateGamesList();
     });
 });
-
-  function generateUniqueGameCode() {
-    let gameCode = '';
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    for (let i = 0; i < 6; i++) {
-        gameCode += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    // Ensure the gameCode is unique
-    while (games[gameCode]) {
-        gameCode = '';
-        for (let i = 0; i < 6; i++) {
-            gameCode += characters.charAt(Math.floor(Math.random() * characters.length));
-        }
-    }
-    return gameCode;
-}
-
 });
 
 class Game {
-  constructor() {
+  constructor(name, maxPlayers, password) {
+    this.name = name; // Name of the game
+    this.maxPlayers = maxPlayers; // Maximum number of players allowed
+    this.password = password; // Password for the game (if any)
+    this.gameCode = this.generateGameCode(); // Game code (assuming you have a method to generate it)
     this.users = [];
     this.currentQuestion = 0;
     this.gameInProgress = false;
@@ -247,8 +251,32 @@ class Game {
     this.questionStartTime = null;
   }
 
+  addPlayer(socket, username, avatar) {
+    // Add the player to this game
+  }
+  
+  processAnswer(socket, data) {
+    // Process an answer for this game
+  }
+
   generateGameId() {
     return Math.floor(Math.random() * 1000000).toString();
+}
+
+generateGameCode() {
+  let gameCode = '';
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  for (let i = 0; i < 6; i++) {
+      gameCode += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  // Ensure the gameCode is unique
+  while (games[gameCode]) {
+      gameCode = '';
+      for (let i = 0; i < 6; i++) {
+          gameCode += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+  }
+  return gameCode;
 }
 
   loadQuestionsAndStart() {
@@ -358,6 +386,11 @@ class Game {
 
   // ... [rest of the methods for the Game class]
 }
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
