@@ -25,26 +25,6 @@ function updateGamesList() {
   io.emit('updateGamesList', gamesList);
 }
 
-app.post('/create', (req, res) => {
-  const { name, maxPlayers, password } = req.body; // Extract these from the request body
-  let game = new Game(name, maxPlayers, password);
-  const gameId = game.generateGameId();
-  games[gameId] = game;
-  updateGamesList(); // Update the active games list
-  res.json({ id: gameId });
-});
-
-app.post('/join', (req, res) => {
-  let game = games[req.body.id];
-  if (game) {
-    game.addPlayer();
-    updateGamesList(); // Update the active games list
-    res.json({ status: 'joined' });
-  } else {
-    res.json({ status: 'not found' });
-  }
-});
-
 io.on('connection', (socket) => {
   console.log('A user connected');
 
@@ -65,30 +45,6 @@ function createGame() {
     private: isPrivate,
     password: gamePassword
   };
-
-  // Send a request to the server to create the game
-  fetch('/create', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(gameData)
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.id) {
-      // Redirect to the game lobby or handle the game creation success
-      window.location.href = `/lobby/${data.id}`;
-    } else {
-      // Handle any errors (e.g., show an error message to the user)
-      alert('Failed to create the game. Please try again.');
-    }
-  })
-  .catch(error => {
-    // Handle any network errors
-    console.error('Error creating the game:', error);
-    alert('An error occurred while creating the game. Please try again.');
-  });
 }
 
 socket.on('joinGame', (gameId, username, avatar) => {
@@ -235,7 +191,7 @@ class Game {
     this.name = name; // Name of the game
     this.maxPlayers = maxPlayers; // Maximum number of players allowed
     this.password = password; // Password for the game (if any)
-    this.gameCode = this.generateGameCode(); // Game code (assuming you have a method to generate it)
+    this.gameCode = this.generateGameId(); // Game code (assuming you have a method to generate it)
     this.users = [];
     this.currentQuestion = 0;
     this.gameInProgress = false;
@@ -260,24 +216,20 @@ class Game {
   }
 
   generateGameId() {
-    return Math.floor(Math.random() * 1000000).toString();
-}
-
-generateGameCode() {
-  let gameCode = '';
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  for (let i = 0; i < 6; i++) {
+    let gameCode = '';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    for (let i = 0; i < 6; i++) {
       gameCode += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  // Ensure the gameCode is unique
-  while (games[gameCode]) {
+    }
+    // Ensure the gameCode is unique
+    while (Object.values(games).some(game => game.gameCode === gameCode)) {
       gameCode = '';
       for (let i = 0; i < 6; i++) {
-          gameCode += characters.charAt(Math.floor(Math.random() * characters.length));
+        gameCode += characters.charAt(Math.floor(Math.random() * characters.length));
       }
+    }
+    return gameCode;
   }
-  return gameCode;
-}
 
   loadQuestionsAndStart() {
     this.currentQuestion = 0;
@@ -386,6 +338,26 @@ generateGameCode() {
 
   // ... [rest of the methods for the Game class]
 }
+
+app.post('/create', (req, res) => {
+  const { name, maxPlayers, password } = req.body;
+  let game = new Game(name, maxPlayers, password);
+  const gameId = game.generateGameId();
+  games[gameId] = game;
+  updateGamesList();
+  res.json({ gameId: gameId });
+});
+
+app.post('/join', (req, res) => {
+  let game = games[req.body.id];
+  if (game) {
+    game.addPlayer();
+    updateGamesList(); // Update the active games list
+    res.json({ status: 'joined' });
+  } else {
+    res.json({ status: 'not found' });
+  }
+});
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
