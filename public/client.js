@@ -19,32 +19,31 @@ let gameId = '';
   let gamePrivacy = 'public'; // default to public
   let maxPlayers = ''; // default to 1 player
 
-  // 2. Event Listeners
-  document.getElementById('createGame').addEventListener('click', function() {
-    const gameNameInput = document.getElementById('game-name');
-    gameName = gameNameInput.value.trim();
-
-    if (gameName && gameName.length <= 15) {
-        createGame(); // Call the createGame function
-    } else {
-        alert('Vänligen ange ett spelnamn med högst 15 tecken.');
-    }
-});
-
-// Function to create a new game
 function createGame() {
+  const gameName = document.getElementById('game-name').value;
+  const maxPlayers = document.getElementById('maxPlayers').value;
+  const gamePassword = document.getElementById('game-password').value; // If you have a password field
+
+  // Validate the input
+  if (!gameName || !maxPlayers) {
+    alert('Please enter a game name and select the maximum number of players.');
+    return;
+  }
+
+  // Create the game object to send to the server
+  const gameData = {
+    name: gameName,
+    maxPlayers: maxPlayers,
+    password: gamePassword // Include this if you have a password field
+  };
+
   // Fetch the create game endpoint
   fetch('/create', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      gameName: gameName,
-      maxPlayers: maxPlayers,
-      gamePrivacy: gamePrivacy,
-      gamePassword: gamePassword // If you have a password field, include it here
-    })
+    body: JSON.stringify(gameData) // Send the game data in the request body
   })
     .then((response) => response.json())
     .then((data) => {
@@ -66,7 +65,6 @@ function createGame() {
     });
 }
 
-// Event Listener
 document.getElementById('createGame').addEventListener('click', function() {
   const gameNameInput = document.getElementById('game-name');
   gameName = gameNameInput.value.trim();
@@ -180,12 +178,6 @@ function showLobby() {
   document.getElementById('lobby').classList.remove('hidden');
 }
 
-document.getElementById('createGame').addEventListener('click', function() {
-  // Make an AJAX request to create a game
-  // On success:
-  showLobby();
-});
-
 document.getElementById('joinGame').addEventListener('click', function() {
   // Make an AJAX request to join a game
   // On success:
@@ -193,10 +185,51 @@ document.getElementById('joinGame').addEventListener('click', function() {
   socket.emit('joinGame');
 });
 
-function joinLobby() {
-  document.getElementById('avatarUsernameView').classList.add('hidden');
-  document.getElementById('lobby').classList.remove('hidden');
+function navigateToAvatarSelection(gameId) {
+  // Store the game ID in a variable or element for later use
+  document.getElementById('gameId').value = gameId;
+
+  // Hide the game creation view
+  document.getElementById('gameCreationView').style.display = 'none';
+
+  // Show the avatar and username selection view
+  document.getElementById('avatarUsernameView').style.display = 'block';
 }
+
+function joinLobby() {
+  const gameId = document.getElementById('gameId').value;
+  const username = document.getElementById('usernameInput').value; // Assuming you have an input for username
+  const avatar = document.getElementById('avatarInput').value; // Assuming you have an input for avatar
+
+  // Validate the input
+  if (!username || !avatar) {
+    alert('Please enter a username and select an avatar.');
+    return;
+  }
+
+  // Send a request to the server to join the game
+  fetch('/join', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ id: gameId, username: username, avatar: avatar })
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.status == 'joined') {
+        // Hide the avatar and username selection view
+        document.getElementById('avatarUsernameView').style.display = 'none';
+
+        // Show the lobby view
+        document.getElementById('lobby').style.display = 'block';
+      } else {
+        alert('Game not found');
+      }
+    });
+}
+
+document.getElementById('joinLobbyButton').addEventListener('click', joinLobby); // Assuming the button has an ID of 'joinLobbyButton'
 
 
 function showAvatarAndUsernameSelection() {
@@ -205,6 +238,7 @@ function showAvatarAndUsernameSelection() {
 }
 
 function selectAvatar(avatarNumber) {
+  document.getElementById('avatarInput').value = avatarNumber;
   avatar = `avatar${avatarNumber}`;
   const avatarImages = document.querySelectorAll('.avatar-selection img');
   avatarImages.forEach((img, index) => {
