@@ -36,10 +36,11 @@
           <label>Privat</label>
       </div>
       <input type="text" id="game-password" placeholder="Lösenord" maxlength="10" class="hidden">
-      <button id="createGame" onclick="createGame()">Skapa spel</button>
+      <button id="createGame">Skapa spel</button>
       <div id="gameIdDisplay"></div>
     </div>
     <div id="joinGame"></div>
+    <input type="hidden" id="gameId">
   </div>
 
   <!-- Avatar and Username Selection View -->
@@ -55,8 +56,9 @@
           <img src="/avatars/avatar4.png" alt="Avatar 4" onclick="selectAvatar(4)">
           <img src="/avatars/avatar5.png" alt="Avatar 5" onclick="selectAvatar(5)">
         </div>
+        <input type="hidden" id="avatarInput">
         <input type="text" id="usernameInput" placeholder="Skriv ditt användarnamn">
-        <button onclick="joinLobby()">Gå med</button>
+        <button id="joinLobbyButton">Gå med</button>
         <div id="avatarSelectedMessage" style="display: none; color: red;">Vänligen välj både karaktär och användarnamn för att gå med i spelet.</div>
       </div>
     </div>
